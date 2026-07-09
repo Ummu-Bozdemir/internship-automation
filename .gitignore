@@ -12,6 +12,7 @@ __pycache__/
 # Files generated during tests
 uploads/
 output/
+pdf-signer/test_files/
 
 # Personal VS Code settings
 .vscode/
