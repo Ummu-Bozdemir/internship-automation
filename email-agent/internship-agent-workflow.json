@@ -1,0 +1,550 @@
+{
+  "name": "Internship Application Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread",
+          "includeSpamTrash": false
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1400,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedDomains = ['akademiata.edu.pl', 'wseiz.edu.pl'];\n\nreturn items.map((item) => {\n  const fromRaw = item.json.from || item.json.headers?.from || '';\n  const emailMatch = fromRaw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i);\n  const senderEmail = emailMatch ? emailMatch[0].toLowerCase() : '';\n  const senderDomain = senderEmail.split('@')[1] || '';\n  const isAllowedDomain = allowedDomains.includes(senderDomain);\n\n  const subject = item.json.subject || '';\n  const textPlain = item.json.textPlain || item.json.text || item.json.snippet || '';\n  const html = item.json.textHtml || item.json.html || '';\n  const emailBody = textPlain || html || item.json.snippet || '';\n\n  return {\n    json: {\n      ...item.json,\n      senderEmail,\n      senderDomain,\n      isAllowedDomain,\n      subject,\n      emailBody,\n      threadId: item.json.threadId,\n      messageId: item.json.id || item.json.messageId\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "id": "extract-email-context",
+      "name": "Extract Email Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isAllowedDomain }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "allowed-domain",
+      "name": "Allowed Domain?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  console.log(`Ignored email from disallowed domain: ${item.json.senderEmail}`);\n  return item;\n});"
+      },
+      "id": "log-ignored-domain",
+      "name": "Log Ignored Domain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You classify emails sent to an internship coordinator. Return only one label: APPROVAL_REQUEST or OTHER. APPROVAL_REQUEST means the student asks the coordinator to approve, sign, accept, confirm, or process an internship application form. OTHER means any unrelated topic."
+            },
+            {
+              "role": "user",
+              "content": "Subject: {{ $json.subject }}\n\nBody:\n{{ $json.emailBody }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "openai-intent-analysis",
+      "name": "OpenAI Intent Analysis",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -680,
+        -120
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  let rawIntent = '';\n\n  if (item.json.message?.content) {\n    rawIntent = item.json.message.content;\n  } else if (item.json.choices?.[0]?.message?.content) {\n    rawIntent = item.json.choices[0].message.content;\n  } else if (item.json.text) {\n    rawIntent = item.json.text;\n  } else if (item.json.output) {\n    rawIntent = item.json.output;\n  }\n\n  const intent = String(rawIntent).trim().toUpperCase().includes('APPROVAL_REQUEST')\n    ? 'APPROVAL_REQUEST'\n    : 'OTHER';\n\n  return {\n    json: {\n      ...item.json,\n      intent\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "id": "normalize-intent",
+      "name": "Normalize Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.intent }}",
+              "operation": "equals",
+              "value2": "APPROVAL_REQUEST"
+            }
+          ]
+        }
+      },
+      "id": "approval-request",
+      "name": "Approval Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -180,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  console.log(`No reply sent. Email is not an internship approval request. Sender: ${item.json.senderEmail}`);\n  return item;\n});"
+      },
+      "id": "log-other-topic",
+      "name": "Log Other Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const binary = item.binary || {};\n  const binaryKeys = Object.keys(binary);\n\n  let pdfBinaryKey = null;\n\n  for (const key of binaryKeys) {\n    const data = binary[key];\n    const fileName = String(data.fileName || '').toLowerCase();\n    const mimeType = String(data.mimeType || '').toLowerCase();\n\n    if (mimeType === 'application/pdf' || fileName.endsWith('.pdf')) {\n      pdfBinaryKey = key;\n      break;\n    }\n  }\n\n  return {\n    json: {\n      ...item.json,\n      hasPdfAttachment: Boolean(pdfBinaryKey),\n      pdfBinaryKey\n    },\n    binary: item.binary\n  };\n});"
+      },
+      "id": "find-pdf-attachment",
+      "name": "Find PDF Attachment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasPdfAttachment }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-pdf",
+      "name": "Has PDF Attachment?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.messageId }}",
+        "message": "Hello,\n\nThank you for your message. I can see that you are requesting approval of an internship application form, but I could not find a PDF attachment.\n\nPlease send the internship application form as a PDF attachment, and I will process it.\n\nBest regards,\nInternship Coordinator",
+        "options": {
+          "threadId": "={{ $json.threadId }}"
+        }
+      },
+      "id": "gmail-reply-missing-pdf",
+      "name": "Reply Missing PDF",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        580,
+        -20
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const pdfBinaryKey = item.json.pdfBinaryKey;\n\n  if (!pdfBinaryKey || !item.binary?.[pdfBinaryKey]) {\n    throw new Error('PDF binary key is missing.');\n  }\n\n  item.binary.pdf = item.binary[pdfBinaryKey];\n\n  return item;\n});"
+      },
+      "id": "prepare-pdf-binary",
+      "name": "Prepare PDF Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        580,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PDF_SIGNER_URL || 'http://pdf-signer:8000/sign' }}",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "pdf",
+              "inputDataFieldName": "pdf"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "signature_image",
+              "inputDataFieldName": "signature_image"
+            },
+            {
+              "name": "keywords",
+              "value": "Signature:,Sign here,Signature,İmza:,Imza:,Podpis:"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "signed_pdf"
+            }
+          },
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "call-pdf-signer",
+      "name": "Call PDF Signer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        -340
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode || 200 }}",
+              "operation": "equal",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "id": "pdf-signer-success",
+      "name": "PDF Signer Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        -340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.messageId }}",
+        "message": "Hello,\n\nYour internship application form has been approved and signed automatically.\n\nPlease find the signed PDF attached.\n\nBest regards,\nInternship Coordinator",
+        "attachmentsUi": {
+          "attachmentsBinary": [
+            {
+              "property": "signed_pdf"
+            }
+          ]
+        },
+        "options": {
+          "threadId": "={{ $json.threadId }}"
+        }
+      },
+      "id": "gmail-reply-signed-pdf",
+      "name": "Reply With Signed PDF",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        -460
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $json.messageId }}",
+        "message": "Hello,\n\nThank you for sending the internship application form.\n\nThe form could not be signed automatically, because the signature location could not be detected. The internship coordinator will review it manually.\n\nBest regards,\nInternship Coordinator",
+        "options": {
+          "threadId": "={{ $json.threadId }}"
+        }
+      },
+      "id": "gmail-reply-manual-review",
+      "name": "Reply Manual Review",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        -220
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.messageId }}",
+        "labelIds": [
+          "needs-manual-review"
+        ]
+      },
+      "id": "add-manual-review-label",
+      "name": "Add Manual Review Label",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1600,
+        -220
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Context": {
+      "main": [
+        [
+          {
+            "node": "Allowed Domain?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowed Domain?": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Intent Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Ignored Domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Intent Analysis": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intent": {
+      "main": [
+        [
+          {
+            "node": "Approval Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Request?": {
+      "main": [
+        [
+          {
+            "node": "Find PDF Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Other Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find PDF Attachment": {
+      "main": [
+        [
+          {
+            "node": "Has PDF Attachment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has PDF Attachment?": {
+      "main": [
+        [
+          {
+            "node": "Prepare PDF Binary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Missing PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare PDF Binary": {
+      "main": [
+        [
+          {
+            "node": "Call PDF Signer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call PDF Signer": {
+      "main": [
+        [
+          {
+            "node": "PDF Signer Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Signer Success?": {
+      "main": [
+        [
+          {
+            "node": "Reply With Signed PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Add Manual Review Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "internship-agent-workflow-v1",
+  "triggerCount": 1,
+  "tags": []
+}
