@@ -16,3 +16,7 @@ pdf-signer/test_files/
 
 # Personal VS Code settings
 .vscode/
+
+# Personal signature image
+assets/*
+!assets/.gitkeep

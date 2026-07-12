@@ -25,6 +25,7 @@ services:
       - n8n_data:/home/node/.n8n
       - ./email-agent:/files/email-agent
       - ./pdf-signer/test_files:/files/test_files
+      - ./assets:/home/node/.n8n-files/assets:ro
     depends_on:
       - pdf-signer
     restart: unless-stopped
