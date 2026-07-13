@@ -4,15 +4,15 @@ services:
       context: ./pdf-signer
       dockerfile: Dockerfile
     container_name: internship-pdf-signer
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     restart: unless-stopped
 
   n8n:
     image: n8nio/n8n:latest
     container_name: internship-n8n
-    ports:
-      - "5678:5678"
+    expose:
+      - "5678"
     environment:
       - N8N_HOST=${SERVICE_FQDN_N8N:-localhost}
       - N8N_PORT=5678
