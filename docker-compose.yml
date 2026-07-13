@@ -25,10 +25,11 @@ services:
       - n8n_data:/home/node/.n8n
       - ./email-agent:/files/email-agent
       - ./pdf-signer/test_files:/files/test_files
-      - ./assets:/home/node/.n8n-files/assets:ro
+      - signature_assets:/home/node/.n8n-files/assets
     depends_on:
       - pdf-signer
     restart: unless-stopped
 
 volumes:
   n8n_data:
+  signature_assets:
