@@ -14,10 +14,12 @@ services:
     expose:
       - "5678"
     environment:
-      - N8N_HOST=${SERVICE_FQDN_N8N:-localhost}
+      - SERVICE_FQDN_N8N_5678
+      - N8N_HOST=${SERVICE_FQDN_N8N_5678}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - WEBHOOK_URL=${SERVICE_URL_N8N:-http://localhost:5678/}
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=${SERVICE_URL_N8N_5678}
+      - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N_5678}
       - PDF_SIGNER_URL=http://pdf-signer:8000/sign
       - GENERIC_TIMEZONE=Europe/Warsaw
       - TZ=Europe/Warsaw
