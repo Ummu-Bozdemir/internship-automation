@@ -4,33 +4,6 @@ services:
       context: ./pdf-signer
       dockerfile: Dockerfile
     container_name: internship-pdf-signer
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     restart: unless-stopped
-
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: internship-n8n
-    expose:
-      - "5678"
-    environment:
-      - N8N_HOST=${SERVICE_FQDN_N8N:-localhost}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - WEBHOOK_URL=${SERVICE_URL_N8N:-http://localhost:5678/}
-      - N8N_EDITOR_BASE_URL=${SERVICE_URL_N8N:-http://localhost:5678/}
-      - PDF_SIGNER_URL=http://pdf-signer:8000/sign
-      - GENERIC_TIMEZONE=Europe/Warsaw
-      - TZ=Europe/Warsaw
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./email-agent:/files/email-agent
-      - ./pdf-signer/test_files:/files/test_files
-      - signature_assets:/home/node/.n8n-files/assets
-    depends_on:
-      - pdf-signer
-    restart: unless-stopped
-
-volumes:
-  n8n_data:
-  signature_assets:
