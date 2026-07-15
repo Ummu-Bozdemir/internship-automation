@@ -1,91 +1,212 @@
-# Testing Guide
+# Testing Guide — Internship Application Agent
 
-This document describes the manual test scenarios for the Internship Application Agent.
+This document describes how to test the Internship Application Agent in the final deployment architecture.
 
-## Prerequisites
+## Final Architecture
 
-Before testing, make sure that:
-
-- Docker Compose is running.
-- The n8n workflow is imported and published.
-- Gmail credentials are configured in n8n.
-- The Groq OpenAI-compatible credential is configured in n8n.
-- The local signature image exists at:
+The final architecture is:
 
 ```text
-assets/signature.png
+Piotr's n8n server (steve107-20107.mikrus.cloud)
+→ runs the n8n workflow
+
+Coolify
+→ runs only the pdf-signer service
+
+n8n workflow
+→ calls the public PDF Signer endpoint over HTTP
 ```
 
-- The signature image is mounted into the n8n container at:
+n8n is not deployed in Coolify. Coolify is used only for the PDF Signer API.
+
+## Services
+
+### n8n
+
+The workflow runs on Piotr's n8n server:
 
 ```text
-/home/node/.n8n-files/assets/signature.png
+https://steve107-20107.mikrus.cloud
 ```
 
-- The PDF Signer service is available from n8n at:
+The workflow name is:
 
 ```text
-http://pdf-signer:8000/sign
+Internship Application Agent
 ```
 
-- Test emails are sent from an allowed sender domain.
+### PDF Signer
 
-Allowed domains:
+The PDF Signer API runs on Coolify.
+
+Public base URL:
+
+```text
+http://ummu-internship-pdf-signer.codewithpeter.com
+```
+
+Main signing endpoint:
+
+```text
+http://ummu-internship-pdf-signer.codewithpeter.com/sign
+```
+
+Health/API documentation endpoints:
+
+```text
+http://ummu-internship-pdf-signer.codewithpeter.com/docs
+http://ummu-internship-pdf-signer.codewithpeter.com/openapi.json
+```
+
+## Required n8n Credentials
+
+The workflow requires two credentials configured directly inside Piotr's n8n server.
+
+### Gmail OAuth2 API
+
+Used by:
+
+```text
+Gmail Trigger
+Reply Missing PDF
+Reply With Signed PDF
+Reply Manual Review
+Add Manual Review Label
+```
+
+OAuth Redirect URL used in Google Cloud Console:
+
+```text
+https://steve107-20107.mikrus.cloud/rest/oauth2-credential/callback
+```
+
+The Gmail account connected to the workflow is:
+
+```text
+ummuzdemir@gmail.com
+```
+
+### Groq OpenAI-Compatible Credential
+
+Used by:
+
+```text
+OpenAI Intent Analysis
+```
+
+Credential type:
+
+```text
+OpenAI-compatible
+```
+
+Base URL:
+
+```text
+https://api.groq.com/openai/v1
+```
+
+Model:
+
+```text
+llama-3.1-8b-instant
+```
+
+## Allowed Sender Domains
+
+The workflow processes emails only from these domains:
 
 ```text
 akademiata.edu.pl
 wseiz.edu.pl
 ```
 
-## Notes
+Emails from other domains should be ignored.
 
-The workflow should be tested in published mode. Do not rely only on the manual **Execute workflow** button, because the Gmail Trigger behaves differently in manual and published executions.
+## Test Preparation
 
-After sending each test email, wait for the Gmail Trigger polling interval and then check the n8n **Executions** tab.
+Before testing:
 
----
+1. Make sure the PDF Signer is running in Coolify.
+2. Make sure the n8n workflow is published.
+3. Do not click `Execute workflow` for production/live tests.
+4. Send test emails to:
 
-## Scenario 1: Approval request with PDF attachment
+```text
+ummuzdemir@gmail.com
+```
+
+5. Send test emails from an allowed sender domain:
+
+```text
+@akademiata.edu.pl
+```
+
+or
+
+```text
+@wseiz.edu.pl
+```
+
+## Test 1 — Approval Request With PDF
 
 ### Purpose
 
-Verify that the workflow detects an internship approval request, finds the attached PDF, signs it, and replies with the signed PDF.
+Verify that the workflow detects an approval request with a PDF attachment, signs the PDF using the PDF Signer service, and replies with the signed PDF.
 
-### Test email
+### Sender
 
-Send an email from an allowed domain.
-
-Subject:
+Allowed school email account:
 
 ```text
-Internship application approval request
+@akademiata.edu.pl
 ```
 
-Body:
+or
+
+```text
+@wseiz.edu.pl
+```
+
+### Recipient
+
+```text
+ummuzdemir@gmail.com
+```
+
+### Subject
+
+```text
+Internship application approval request - PDF attached
+```
+
+### Body
 
 ```text
 Hello,
 
-Please process my internship application.
+Please process and sign my internship application form.
 
 Program: Computer Science
 Semester: 4
 Company: Example Software House
 Internship period: 01.08.2026 - 30.09.2026
 
-I attached the internship application PDF form for approval.
+The internship application PDF is attached.
 
 Best regards,
 Jane Student
 ```
 
-Attachment:
+### Attachment
+
+Attach a PDF file, for example:
 
 ```text
 sample_internship_form.pdf
 ```
 
-### Expected n8n path
+### Expected n8n Execution Path
 
 ```text
 Gmail Trigger
@@ -97,92 +218,65 @@ Gmail Trigger
 → Find PDF Attachment
 → Has PDF Attachment?
 → Prepare PDF Binary
-→ Read/Write Files from Disk
+→ Create Signature Binary
 → Merge PDF + Signature
 → Call PDF Signer
 → PDF Signer Success?
 → Reply With Signed PDF
 ```
 
-### Expected result
+### Expected Result
 
-- Workflow execution succeeds.
-- A reply email is sent.
-- The reply contains a signed PDF attachment.
-- The signed PDF contains the signature image.
+The sender receives a reply with a signed PDF attached.
 
----
-
-## Scenario 2: Unrelated email
-
-### Purpose
-
-Verify that unrelated academic emails are ignored and do not receive an automatic reply.
-
-### Test email
-
-Send an email from an allowed domain.
-
-Subject:
-
-```text
-Question about the class schedule
-```
-
-Body:
+Expected reply text:
 
 ```text
 Hello,
 
-Could you please provide information about this semester's class schedule and weekly timetable?
+Your internship application form has been approved and signed automatically.
 
-Thank you.
+Please find the signed PDF attached.
+
+Best regards,
+Internship Coordinator
 ```
 
-No attachment is required.
+The attached PDF should contain the signature image placed in the signature area.
 
-### Expected n8n path
-
-```text
-Gmail Trigger
-→ Extract Email Context
-→ Allowed Domain?
-→ OpenAI Intent Analysis
-→ Normalize Intent
-→ Approval Request?
-→ Log Other Topic
-```
-
-### Expected result
-
-- Workflow execution succeeds.
-- Intent is normalized as:
-
-```text
-other
-```
-
-- No Gmail reply is sent.
-
----
-
-## Scenario 3: Approval request without PDF attachment
+## Test 2 — Approval Request Without PDF
 
 ### Purpose
 
-Verify that an approval request without a PDF is still recognized as an approval request, but receives a missing PDF reply.
+Verify that the workflow detects an approval request without a PDF attachment and asks the sender to send the PDF.
 
-### Test email
+### Sender
 
-Send an email from an allowed domain.
+Allowed school email account:
 
-Subject:
+```text
+@akademiata.edu.pl
+```
+
+or
+
+```text
+@wseiz.edu.pl
+```
+
+### Recipient
+
+```text
+ummuzdemir@gmail.com
+```
+
+### Subject
 
 ```text
 Internship application approval request
 ```
 
-Body:
+### Body
 
 ```text
 Hello,
@@ -200,9 +294,11 @@ Best regards,
 Jane Student
 ```
 
-No attachment.
+### Attachment
 
-### Expected n8n path
+Do not attach any file.
+
+### Expected n8n Execution Path
 
 ```text
 Gmail Trigger
@@ -216,27 +312,152 @@ Gmail Trigger
 → Reply Missing PDF
 ```
 
-### Expected result
+### Expected Result
 
-- Workflow execution succeeds.
-- Intent is normalized as:
+The sender receives a reply asking for the missing PDF attachment.
+
+Expected reply text:
 
 ```text
-approval_request
+Hello,
+
+Thank you for your message. I can see that you are requesting approval of an internship application form, but I could not find a PDF attachment.
+
+Please send the internship application form as a PDF attachment, and I will process it.
+
+Best regards,
+Internship Coordinator
 ```
 
-- A reply email is sent.
-- The reply asks the sender to send the internship application form as a PDF attachment.
-- No signed PDF is sent.
+## Test 3 — Unrelated Email
 
----
+### Purpose
 
-## Expected production behavior
+Verify that the workflow does not reply to emails that are not internship application approval requests.
 
-The workflow should only reply automatically when:
+### Sender
 
-- The sender domain is allowed.
-- The email is about internship application approval.
-- The workflow either signs the attached PDF or asks for the missing PDF.
+Allowed school email account:
 
-The workflow should not reply to unrelated emails.
+```text
+@akademiata.edu.pl
+```
+
+or
+
+```text
+@wseiz.edu.pl
+```
+
+### Recipient
+
+```text
+ummuzdemir@gmail.com
+```
+
+### Subject
+
+```text
+Ders programı hakkında soru
+```
+
+### Body
+
+```text
+Hello,
+
+I would like to ask about the class schedule for this semester.
+
+Could you please let me know where I can find the timetable?
+
+Best regards,
+Jane Student
+```
+
+### Attachment
+
+Do not attach any file.
+
+### Expected n8n Execution Path
+
+```text
+Gmail Trigger
+→ Extract Email Context
+→ Allowed Domain?
+→ OpenAI Intent Analysis
+→ Normalize Intent
+→ Approval Request?
+→ Log Other Topic
+```
+
+### Expected Result
+
+No reply should be sent.
+
+The workflow should finish successfully.
+
+## Test 4 — Ignored Domain
+
+### Purpose
+
+Verify that the workflow ignores emails from domains that are not allowed.
+
+### Sender
+
+A non-school email address, for example:
+
+```text
+@gmail.com
+```
+
+### Recipient
+
+```text
+ummuzdemir@gmail.com
+```
+
+### Subject
+
+```text
+Internship application approval request
+```
+
+### Body
+
+```text
+Hello,
+
+Please process my internship application form.
+
+Best regards,
+Jane Student
+```
+
+### Expected n8n Execution Path
+
+```text
+Gmail Trigger
+→ Extract Email Context
+→ Allowed Domain?
+→ Log Ignored Domain
+```
+
+### Expected Result
+
+No reply should be sent.
+
+The workflow should not call Groq.
+
+The workflow should not call PDF Signer.
+
+## Notes
+
+For live tests after the workflow is published, do not click:
+
+```text
+Execute workflow
+```
+
+The published Gmail Trigger should automatically pick up new emails.
+
+Use the n8n `Executions` tab to verify which nodes ran.
