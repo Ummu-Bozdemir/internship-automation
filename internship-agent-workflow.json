@@ -19,18 +19,18 @@
           "downloadAttachments": true
         }
       },
-      "id": "66462de7-fc8c-4990-ad8d-e5e26b8afef1",
+      "id": "b27ca81c-bc4c-465d-aa1d-9f1b4c0b935c",
       "name": "Gmail Trigger",
       "type": "n8n-nodes-base.gmailTrigger",
       "typeVersion": 1.2,
       "position": [
-        -2736,
+        -3152,
         464
       ],
       "credentials": {
         "gmailOAuth2": {
-          "id": "bjerCHMODXQCMwPo",
-          "name": "Gmail account"
+          "id": "3fyUiYLoJ2yKTzQA",
+          "name": "Gmail account 4"
         }
       }
     },
@@ -38,12 +38,12 @@
       "parameters": {
         "jsCode": "const allowedDomains = ['akademiata.edu.pl', 'wseiz.edu.pl', 'gmail.com'];\n\nreturn items.map((item) => {\n  const fromValue = item.json.from || item.json.headers?.from || '';\n\nlet fromRaw = '';\n\nif (typeof fromValue === 'string') {\n  fromRaw = fromValue;\n} else if (fromValue?.text) {\n  fromRaw = fromValue.text;\n} else if (fromValue?.html) {\n  fromRaw = fromValue.html;\n} else if (Array.isArray(fromValue?.value) && fromValue.value[0]?.address) {\n  fromRaw = fromValue.value[0].address;\n} else {\n  fromRaw = JSON.stringify(fromValue);\n}\n\nconst allowedDomains = ['akademiata.edu.pl', 'wseiz.edu.pl'];\nconst emailMatch = String(fromRaw).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i);\nconst senderEmail = emailMatch ? emailMatch[0].toLowerCase() : '';\nconst senderDomain = senderEmail.split('@')[1] || '';\nconst isAllowedDomain = allowedDomains.includes(senderDomain);\n\n  const subject = item.json.subject || '';\n  const textPlain = item.json.textPlain || item.json.text || item.json.snippet || '';\n  const html = item.json.textHtml || item.json.html || '';\n  const emailBody = textPlain || html || item.json.snippet || '';\n\n  return {\n    json: {\n      ...item.json,\n      senderEmail,\n      senderDomain,\n      isAllowedDomain,\n      subject,\n      emailBody,\n      threadId: item.json.threadId,\n      messageId: item.json.id || item.json.messageId\n    },\n    binary: item.binary\n  };\n});"
       },
-      "id": "0b4149bb-1a67-4cdd-a1da-55cdae11af8a",
+      "id": "9a639dc9-9aef-403f-a189-6bd2dbfffe42",
       "name": "Extract Email Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2496,
+        -2912,
         464
       ]
     },
@@ -58,12 +58,12 @@
           ]
         }
       },
-      "id": "3696c583-d3b8-486e-afdc-5ec3783e34cb",
+      "id": "f676a339-f418-43cd-9030-b865ab742a02",
       "name": "Allowed Domain?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -2256,
+        -2672,
         464
       ]
     },
@@ -71,12 +71,12 @@
       "parameters": {
         "jsCode": "return items.map((item) => {\n  console.log(`Ignored email from disallowed domain: ${item.json.senderEmail}`);\n  return item;\n});"
       },
-      "id": "936697e4-2d5d-4960-8a89-e38810668445",
+      "id": "48cfa044-117d-450d-8074-45b78841d781",
       "name": "Log Ignored Domain",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2016,
+        -2432,
         688
       ]
     },
@@ -90,38 +90,38 @@
         "messages": {
           "values": [
             {
-              "content": "=You are an email intent classifier for an internship application approval automation.\n\nYour task is to decide whether the email is asking the coordinator to process, approve, sign, review, or handle an internship application or internship application form.\n\nReturn ONLY valid JSON. Do not include markdown. Do not include explanations outside JSON.\n\nAllowed JSON format:\n{\n  \"intent\": \"approval_request\",\n  \"reason\": \"short reason\"\n}\n\nor\n\n{\n  \"intent\": \"OTHER\",\n  \"reason\": \"short reason\"\n}\n\nClassification rules:\n\nReturn \"approval_request\" when the email clearly asks to process, approve, sign, review, submit, or handle an internship application, internship form, or internship application PDF.\n\nImportant:\nThe email does NOT need to have a PDF attachment to be an approval_request.\nIf the sender says they forgot the PDF, but still asks to process or approve an internship application, it is still an approval_request.\n\nPositive examples that MUST be classified as approval_request:\n- \"Please process my internship application.\"\n- \"I request approval for my internship application.\"\n- \"Please approve my internship application.\"\n- \"Please sign my internship form.\"\n- \"Please review my internship application form.\"\n- \"I attached my internship application form for approval.\"\n- \"Please handle the attached internship application PDF.\"\n- \"I am submitting my internship application for approval.\"\n- \"Please process my internship application, but I forgot to attach the PDF form.\"\n- \"I am sending this request for approval, but I forgot to attach the PDF form.\"\n\nReturn \"OTHER\" for emails that are not asking to process/approve/sign/review an internship application.\n\nNegative examples that MUST be classified as OTHER:\n- questions about class schedule\n- questions about timetable\n- course or lesson questions\n- exam questions\n- general academic questions\n- administrative questions not about internship application approval\n- messages about internships in general but not asking for approval/processing/signing/review\n- emails that only ask for information\n- emails with no clear request about an internship application or internship form\n\nStrict distinction:\nIf the email asks to process, approve, sign, review, submit, or handle an internship application, return \"approval_request\".\nIf the email asks about class schedules, courses, exams, timetables, or general information, return \"OTHER\".\n\nDo not infer approval intent only from school domain or polite wording.\nDo not require a PDF attachment to classify as approval_request.\n\nNow classify the email."
+              "content": "=You are an email intent classifier for an internship application approval automation.\n\nClassify ONLY the actual email content provided at the end between EMAIL_START and EMAIL_END.\n\nReturn ONLY valid JSON. Do not include markdown. Do not include explanations outside JSON.\n\nAllowed JSON format:\n\n{\n  \"intent\": \"approval_request\",\n  \"reason\": \"short reason\"\n}\n\nor\n\n{\n  \"intent\": \"OTHER\",\n  \"reason\": \"short reason\"\n}\n\nVERY IMPORTANT RULES:\n\nReturn \"approval_request\" ONLY if the actual email explicitly asks to process, approve, sign, review, submit, or handle an internship application, internship application form, or internship application PDF.\n\nThe email does NOT need to have a PDF attachment to be an approval_request.\nIf the sender says they forgot the PDF but still asks to process or approve an internship application, return \"approval_request\".\n\nReturn \"OTHER\" for all emails about:\n- class schedule\n- timetable\n- lesson schedule\n- course schedule\n- semester schedule\n- exams\n- lectures\n- general academic questions\n- general administrative questions\n- asking where to find information\n- internships in general without asking to process/approve/sign/review an internship application form\n\nHard negative examples:\n- \"I would like to ask about the class schedule for this semester.\" => OTHER\n- \"Where can I find the timetable?\" => OTHER\n- \"Ders programı hakkında soru\" => OTHER\n- \"Could you please let me know where I can find the timetable?\" => OTHER\n- \"When are the classes?\" => OTHER\n\nDo NOT infer approval intent from:\n- sender domain\n- polite wording\n- the word \"semester\"\n- the word \"program\"\n- the word \"student\"\n- examples in this prompt\n\nOnly classify the actual email below.\n\nEMAIL_START\n\nSubject:\n{{ $json.subject || $json.emailSubject || $json.headers?.subject || '' }}\n\nText:\n{{ $json.textPlain || $json.text || $json.body || $json.snippet || $json.emailText || $json.message || '' }}\n\nEMAIL_END"
             }
           ]
         },
         "jsonOutput": true,
         "options": {}
       },
-      "id": "d5499502-ef08-4937-9ef8-3d44aa316ac4",
+      "id": "685147d4-4cda-47be-9aad-c00681a2f97a",
       "name": "OpenAI Intent Analysis",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
       "position": [
-        -2016,
+        -2432,
         352
       ],
       "credentials": {
         "openAiApi": {
-          "id": "26aS5EWkprwr86sp",
-          "name": "Groq account"
+          "id": "kaqxcnFs8Eu6sWAR",
+          "name": "Groq OpenAI Compatible"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "return items.map((item) => {\n  const content = item.json.message?.content || {};\n\n  const intent =\n    content.intent ||\n    item.json.intent ||\n    'other';\n\n  const reason =\n    content.reason ||\n    item.json.reason ||\n    '';\n\n  return {\n    json: {\n      ...item.json,\n      intent: String(intent).toLowerCase(),\n      reason: String(reason),\n    },\n    binary: item.binary,\n  };\n});"
+        "jsCode": "const items = $input.all();\n\nfunction getFirstJson(nodeName) {\n  try {\n    return $(nodeName).first().json || {};\n  } catch (error) {\n    return {};\n  }\n}\n\nconst gmail = getFirstJson('Gmail Trigger');\nconst extracted = getFirstJson('Extract Email Context');\n\nreturn items.map((item) => {\n  const content = item.json.message?.content || item.json.content || {};\n\n  const rawIntent =\n    content.intent ||\n    item.json.intent ||\n    'other';\n\n  const reason =\n    content.reason ||\n    item.json.reason ||\n    '';\n\n  let intent =\n    String(rawIntent).trim().toLowerCase() === 'approval_request'\n      ? 'approval_request'\n      : 'other';\n\n  const emailText = [\n    gmail.subject,\n    gmail.textPlain,\n    gmail.text,\n    gmail.body,\n    gmail.snippet,\n    extracted.subject,\n    extracted.emailSubject,\n    extracted.textPlain,\n    extracted.text,\n    extracted.body,\n    extracted.snippet,\n    extracted.emailText,\n    extracted.message,\n  ]\n    .filter(Boolean)\n    .join(' ')\n    .toLowerCase();\n\n  const clearlyOtherTopic =\n    emailText.includes('ders programı') ||\n    emailText.includes('ders programi') ||\n    emailText.includes('class schedule') ||\n    emailText.includes('timetable') ||\n    emailText.includes('lesson schedule') ||\n    emailText.includes('course schedule') ||\n    emailText.includes('exam schedule') ||\n    emailText.includes('lecture schedule') ||\n    emailText.includes('where can i find the timetable') ||\n    emailText.includes('where i can find the timetable');\n\n  if (clearlyOtherTopic) {\n    intent = 'other';\n  }\n\n  return {\n    json: {\n      ...item.json,\n      intent,\n      isApprovalRequest: intent === 'approval_request',\n      reason: clearlyOtherTopic\n        ? 'Clearly about class schedule/timetable, not internship application approval.'\n        : String(reason),\n    },\n    binary: item.binary,\n  };\n});"
       },
-      "id": "e7df24d8-cb5c-40fa-9efd-81d27b2f3d48",
+      "id": "284b113d-6152-4948-8063-cc83798b3dcc",
       "name": "Normalize Intent",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1744,
+        -2160,
         352
       ]
     },
@@ -129,12 +129,12 @@
       "parameters": {
         "jsCode": "return items.map((item) => {\n  console.log(`No reply sent. Email is not an internship approval request. Sender: ${item.json.senderEmail}`);\n  return item;\n});"
       },
-      "id": "45ba8363-2fbb-44d1-9b1d-39b6bcc69f37",
+      "id": "bec9b2f3-0d2e-4f58-a385-806b32eaec52",
       "name": "Log Other Topic",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1264,
+        -1680,
         592
       ]
     },
@@ -142,12 +142,12 @@
       "parameters": {
         "jsCode": "return items.map((item, index) => {\n  let binary = item.binary || {};\n\n  // Groq/OpenAI node binary veriyi düşürdüyse Gmail Trigger'dan geri al\n  if (!binary || Object.keys(binary).length === 0) {\n    const gmailItems = $items('Gmail Trigger');\n    binary = gmailItems[index]?.binary || gmailItems[0]?.binary || {};\n  }\n\n  const binaryKeys = Object.keys(binary);\n\n  let pdfBinaryKey = null;\n\n  for (const key of binaryKeys) {\n    const data = binary[key] || {};\n    const fileName = String(data.fileName || '').toLowerCase();\n    const mimeType = String(data.mimeType || '').toLowerCase();\n    const fileExtension = String(data.fileExtension || '').toLowerCase();\n\n    if (\n      mimeType === 'application/pdf' ||\n      fileExtension === 'pdf' ||\n      fileName.endsWith('.pdf')\n    ) {\n      pdfBinaryKey = key;\n      break;\n    }\n  }\n\n  return {\n    json: {\n      ...item.json,\n      hasPdfAttachment: Boolean(pdfBinaryKey),\n      pdfBinaryKey,\n    },\n    binary,\n  };\n});"
       },
-      "id": "bbff2b4c-58e4-4a15-b4af-da409ce56061",
+      "id": "01ba753d-fc04-4200-a144-cc29d63426c2",
       "name": "Find PDF Attachment",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1264,
+        -1680,
         240
       ]
     },
@@ -162,12 +162,12 @@
           ]
         }
       },
-      "id": "1f7cda52-7b95-415d-9a9e-e39ac343a362",
+      "id": "c109b77b-ffd9-4e0e-af44-8e1d0a2df47f",
       "name": "Has PDF Attachment?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -1024,
+        -1440,
         240
       ]
     },
@@ -178,19 +178,19 @@
         "message": "Hello,\n\nThank you for your message. I can see that you are requesting approval of an internship application form, but I could not find a PDF attachment.\n\nPlease send the internship application form as a PDF attachment, and I will process it.\n\nBest regards,\nInternship Coordinator",
         "options": {}
       },
-      "id": "71ef4ece-64b1-418d-8b3f-533763816e66",
+      "id": "cf14ffc1-fe38-44cd-9d00-0f3eaff4b978",
       "name": "Reply Missing PDF",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        -768,
+        -1184,
         448
       ],
       "webhookId": "acacff48-60fe-4164-a728-d53722177616",
       "credentials": {
         "gmailOAuth2": {
-          "id": "bjerCHMODXQCMwPo",
-          "name": "Gmail account"
+          "id": "3fyUiYLoJ2yKTzQA",
+          "name": "Gmail account 4"
         }
       }
     },
@@ -198,19 +198,19 @@
       "parameters": {
         "jsCode": "return items.map((item) => {\n  const pdfBinaryKey = item.json.pdfBinaryKey;\n\n  if (!pdfBinaryKey || !item.binary?.[pdfBinaryKey]) {\n    throw new Error('PDF binary key is missing.');\n  }\n\n  item.binary.pdf = item.binary[pdfBinaryKey];\n\n  return item;\n});"
       },
-      "id": "ed5c352e-6ff5-47e7-8507-ec1e160e9c94",
+      "id": "2ea5fd54-313e-4d46-b9dc-694dada28566",
       "name": "Prepare PDF Binary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -768,
+        -1184,
         128
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://pdf-signer:8000/sign",
+        "url": "=http://ummu-internship-pdf-signer.codewithpeter.com/sign",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
@@ -240,12 +240,12 @@
           }
         }
       },
-      "id": "404f3b6c-8ff1-4a2c-a6d5-59ea6fa03ace",
+      "id": "0a76c2f5-6d87-43e5-a366-ed991cedc288",
       "name": "Call PDF Signer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -80,
+        -288,
         128
       ],
       "continueOnFail": true
@@ -262,12 +262,12 @@
           ]
         }
       },
-      "id": "c81b861e-f94b-4b80-87f4-9ceb1911a08f",
+      "id": "bad80181-4520-461f-a2af-a65f3820e479",
       "name": "PDF Signer Success?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        160,
+        -48,
         128
       ]
     },
@@ -284,66 +284,66 @@
           }
         }
       },
-      "id": "98376fe8-cae7-43ea-b5a6-4c0fe7878c11",
+      "id": "39a22e6e-f0dd-4e3b-b6ae-905158ead633",
       "name": "Reply With Signed PDF",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        416,
+        208,
         0
       ],
       "webhookId": "b1226393-66bd-4c51-8b1d-e2843075ac3e",
       "credentials": {
         "gmailOAuth2": {
-          "id": "bjerCHMODXQCMwPo",
-          "name": "Gmail account"
+          "id": "3fyUiYLoJ2yKTzQA",
+          "name": "Gmail account 4"
         }
       }
     },
     {
       "parameters": {
         "operation": "reply",
-        "messageId": "={{ $json.messageId }}",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
         "message": "Hello,\n\nThank you for sending the internship application form.\n\nThe form could not be signed automatically, because the signature location could not be detected. The internship coordinator will review it manually.\n\nBest regards,\nInternship Coordinator",
         "options": {}
       },
-      "id": "91f990d8-3316-441f-beb3-eb66ca35d3dd",
+      "id": "cac62f7f-c56c-4d87-aa86-06502296f3a2",
       "name": "Reply Manual Review",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        416,
+        208,
         240
       ],
       "webhookId": "376f19fb-9f36-454f-b3db-241c6d89e5dd",
       "credentials": {
         "gmailOAuth2": {
-          "id": "bjerCHMODXQCMwPo",
-          "name": "Gmail account"
+          "id": "3fyUiYLoJ2yKTzQA",
+          "name": "Gmail account 4"
         }
       }
     },
     {
       "parameters": {
         "operation": "addLabels",
-        "messageId": "={{ $json.messageId }}",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
         "labelIds": [
           "needs-manual-review"
         ]
       },
-      "id": "0dd1cb7f-de6d-42f3-b051-b04750a2fae5",
+      "id": "0c51dfa4-9635-42d8-aa34-8651a9317bb4",
       "name": "Add Manual Review Label",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        688,
+        480,
         240
       ],
       "webhookId": "09a384c7-e059-4926-9b5d-7e2dcb7ce941",
       "credentials": {
         "gmailOAuth2": {
-          "id": "bjerCHMODXQCMwPo",
-          "name": "Gmail account"
+          "id": "3fyUiYLoJ2yKTzQA",
+          "name": "Gmail account 4"
         }
       }
     },
@@ -376,10 +376,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1504,
+        -1920,
         352
       ],
-      "id": "f7174375-fc84-45dd-9595-b0b023ff1229",
+      "id": "6a63e47b-e8bf-48ed-8683-305f7df49e70",
       "name": "Approval Request?"
     },
     {
@@ -390,24 +390,37 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        -560,
-        128
+        -992,
+        -176
       ],
-      "id": "ac998f45-0d2f-486f-a63e-79bac3d8f74e",
+      "id": "75e75060-fc25-4692-a773-1cc852ebfcb2",
       "name": "Read/Write Files from Disk"
     },
     {
       "parameters": {
-        "jsCode": "const signatureItem = $input.first();\nconst prepareItem = $('Prepare PDF Binary').first();\n\nconst signatureBinary = signatureItem.binary?.data;\nconst pdfBinary =\n  prepareItem.binary?.pdf ||\n  prepareItem.binary?.attachment_0 ||\n  Object.values(prepareItem.binary || {}).find((file) => {\n    return (\n      String(file.mimeType || '').toLowerCase() === 'application/pdf' ||\n      String(file.fileExtension || '').toLowerCase() === 'pdf' ||\n      String(file.fileName || '').toLowerCase().endsWith('.pdf')\n    );\n  });\n\nif (!pdfBinary) {\n  throw new Error('PDF binary bulunamadı. Prepare PDF Binary output içinde pdf veya attachment_0 yok.');\n}\n\nif (!signatureBinary) {\n  throw new Error('Signature binary bulunamadı. Read/Write Files from Disk output içinde data yok.');\n}\n\nreturn [\n  {\n    json: {\n      ...prepareItem.json,\n      pdfBinaryKey: 'pdf',\n      signatureImageBinaryKey: 'signature_image',\n    },\n    binary: {\n      pdf: pdfBinary,\n      signature_image: signatureBinary,\n    },\n  },\n];"
+        "jsCode": "const item = $input.first();\n\nconst pdfBinary =\n  item.binary?.pdf ||\n  item.binary?.attachment_0 ||\n  Object.values(item.binary || {}).find((file) => {\n    return (\n      String(file.mimeType || '').toLowerCase() === 'application/pdf' ||\n      String(file.fileExtension || '').toLowerCase() === 'pdf' ||\n      String(file.fileName || '').toLowerCase().endsWith('.pdf')\n    );\n  });\n\nconst signatureBinary = item.binary?.signature_image;\n\nif (!pdfBinary) {\n  throw new Error('PDF binary bulunamadı.');\n}\n\nif (!signatureBinary) {\n  throw new Error('signature_image binary bulunamadı.');\n}\n\nreturn [\n  {\n    json: {\n      ...item.json,\n      pdfBinaryKey: 'pdf',\n      signatureImageBinaryKey: 'signature_image',\n    },\n    binary: {\n      pdf: pdfBinary,\n      signature_image: signatureBinary,\n    },\n  },\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -352,
+        -512,
         128
       ],
-      "id": "4d5c06b7-6d34-4e02-8971-7dbb36b977d9",
+      "id": "5b1af069-b384-4e5d-a577-cd28c732610e",
       "name": "Merge PDF + Signature"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst signatureBase64 = `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`;\n\nreturn items.map((item) => {\n  return {\n    json: {\n      ...item.json,\n    },\n    binary: {\n      ...item.binary,\n      signature_image: {\n        data: signatureBase64,\n        mimeType: 'image/png',\n        fileName: 'signature.png',\n        fileExtension: 'png',\n      },\n    },\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        128
+      ],
+      "id": "634e7596-6c87-4677-91e0-37195c94aa8d",
+      "name": "Create Signature Binary"
     }
   ],
   "pinData": {},
@@ -507,7 +520,7 @@
       "main": [
         [
           {
-            "node": "Read/Write Files from Disk",
+            "node": "Create Signature Binary",
             "type": "main",
             "index": 0
           }
@@ -574,13 +587,7 @@
     },
     "Read/Write Files from Disk": {
       "main": [
-        [
-          {
-            "node": "Merge PDF + Signature",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Merge PDF + Signature": {
@@ -593,20 +600,29 @@
           }
         ]
       ]
+    },
+    "Create Signature Binary": {
+      "main": [
+        [
+          {
+            "node": "Merge PDF + Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "11bef5de-6ec8-4b5a-ae92-9f517316cdbb",
+  "versionId": "dd36dbaf-9558-45e8-83a1-188ee9748085",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "ac8a41448158acb8f5200fbc8a92e58290050a50f66f85b19f59a40f542d72e6"
+    "instanceId": "548161637e67aff2c662dfb8e91096ff1496b4312056d452c42c7589abd66e88"
   },
-  "nodeGroups": [],
-  "id": "3ga2tKwcG8FqasSA",
+  "id": "VlCMSFtzRDLRhRPD",
   "tags": []
 }
