@@ -1,296 +1,396 @@
 # Internship Application Agent
 
-This project is an automated internship application email agent built with n8n, Gmail, Groq, and a custom PDF signer service.
+This project automates the processing of internship application approval emails.
 
-The workflow listens for incoming Gmail messages, checks whether the sender domain is allowed, classifies the email intent with an OpenAI-compatible Groq model, signs internship application PDF forms, and replies to the sender with the signed PDF.
+The system receives internship application emails in Gmail, classifies the email intent with Groq, detects PDF attachments, signs the internship application PDF using a deployed PDF Signer API, and replies to the sender automatically.
 
-## Features
+## Final Architecture
 
-- Watches incoming Gmail messages with n8n.
-- Allows only approved sender domains.
-- Uses Groq through an OpenAI-compatible API connection for email intent classification.
-- Detects internship application approval requests.
-- Ignores unrelated academic or administrative emails.
-- Detects missing PDF attachments and replies with a missing-PDF message.
-- Signs internship application PDFs using a separate PDF signer service.
-- Replies to the original Gmail thread with the signed PDF attached.
-- Keeps private credentials, `.env` files, and signature images out of Git.
+The final architecture is:
 
-## Architecture
+```text
+Piotr's n8n server (steve107-20107.mikrus.cloud)
+→ runs the n8n workflow
+
+Coolify
+→ runs only the pdf-signer service
+
+n8n workflow
+→ calls the public PDF Signer endpoint over HTTP
+```
+
+Important:
+
+```text
+n8n is not deployed in Coolify.
+Coolify is used only for the PDF Signer API.
+```
+
+## What the Workflow Does
+
+The n8n workflow handles four main cases:
+
+1. **Allowed sender + internship approval request + PDF attached**
+
+   The workflow signs the PDF and replies with the signed PDF attached.
+
+2. **Allowed sender + internship approval request + no PDF**
+
+   The workflow replies and asks the sender to send the internship application form as a PDF attachment.
+
+3. **Allowed sender + unrelated email**
+
+   The workflow logs the email topic and does not send a reply.
+
+4. **Non-allowed sender domain**
+
+   The workflow ignores the email and does not call Groq or the PDF Signer.
+
+## Main Components
+
+### n8n Workflow
+
+The workflow runs on Piotr's n8n server:
+
+```text
+https://steve107-20107.mikrus.cloud
+```
+
+Workflow name:
+
+```text
+Internship Application Agent
+```
+
+The workflow is responsible for:
 
 ```text
 Gmail Trigger
-→ Extract Email Context
-→ Allowed Domain?
-→ Intent Classification with Groq
-→ Normalize Intent
-→ Approval Request?
-→ Find PDF Attachment
-→ Has PDF Attachment?
-→ Prepare PDF Binary
-→ Read Signature Image from Disk
-→ Merge PDF + Signature
-→ Call PDF Signer
-→ Reply With Signed PDF
+→ sender/domain extraction
+→ allowed domain check
+→ Groq intent classification
+→ PDF attachment detection
+→ signature binary preparation
+→ PDF Signer API call
+→ Gmail reply
 ```
 
-For approval requests without a PDF attachment:
+### PDF Signer API
+
+The PDF Signer API runs on Coolify.
+
+Public base URL:
 
 ```text
-Gmail Trigger
-→ Extract Email Context
-→ Allowed Domain?
-→ Intent Classification with Groq
-→ Normalize Intent
-→ Approval Request?
-→ Find PDF Attachment
-→ Has PDF Attachment?
-→ Reply Missing PDF
+http://ummu-internship-pdf-signer.codewithpeter.com
 ```
 
-For unrelated emails:
+Signing endpoint:
 
 ```text
-Gmail Trigger
-→ Extract Email Context
-→ Allowed Domain?
-→ Intent Classification with Groq
-→ Normalize Intent
-→ Approval Request?
-→ Log Other Topic
+http://ummu-internship-pdf-signer.codewithpeter.com/sign
 ```
 
-## Services
-
-The project uses two main local services:
-
-### n8n
-
-n8n is responsible for:
-
-- Gmail trigger and Gmail replies
-- Workflow orchestration
-- Domain filtering
-- AI intent classification
-- Calling the PDF signer service
-
-Local n8n URL:
+Documentation endpoints:
 
 ```text
-http://localhost:5678
+http://ummu-internship-pdf-signer.codewithpeter.com/docs
+http://ummu-internship-pdf-signer.codewithpeter.com/openapi.json
 ```
 
-### PDF Signer
-
-The PDF signer is a separate Python/FastAPI service responsible for signing PDF files.
-
-Internal Docker URL used by n8n:
-
-```text
-http://pdf-signer:8000/sign
-```
-
-The signer expects a `POST` request with two form-data binary fields:
+The `/sign` endpoint expects a multipart form-data request with:
 
 ```text
 pdf
 signature_image
+keywords
 ```
 
-The signed PDF is returned to n8n as a binary file.
+It returns the signed PDF as a binary file.
 
-## Repository structure
+## Repository Structure
 
 ```text
-.
-├── assets/
-│   └── .gitkeep
-├── email-agent/
+internship-automation/
 ├── pdf-signer/
+│   ├── Dockerfile
 │   ├── main.py
 │   ├── sign_pdf.py
 │   ├── requirements.txt
-│   └── Dockerfile
+│   └── test_files/
+├── email-agent/
+├── assets/
+│   └── .gitkeep
+├── internship-agent-workflow.json
+├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
-├── docker-compose.yml
-├── internship-agent-workflow.json
 ├── TEST.md
 └── README.md
 ```
 
-## Local setup
+## PDF Signer Service
 
-### 1. Clone the repository
+The PDF Signer service is a FastAPI application.
 
-```bash
-git clone https://github.com/Ummu-Bozdemir/internship-automation.git
-cd internship-automation
-```
-
-### 2. Create the local signature image
-
-Create this file locally:
+It provides:
 
 ```text
-assets/signature.png
+GET  /health
+GET  /docs
+GET  /openapi.json
+POST /sign
 ```
 
-This file is intentionally ignored by Git because it is private.
-
-The Docker Compose setup mounts the local `assets` directory into the n8n container:
+The `/sign` endpoint receives:
 
 ```text
-/home/node/.n8n-files/assets
+pdf: uploaded PDF file
+signature_image: uploaded PNG/JPG signature image
+keywords: optional signature search keywords
 ```
 
-The n8n workflow reads the signature from:
+If coordinates are not provided, the service searches for signature keywords in the PDF and places the signature image near the detected signature area.
+
+## n8n Workflow Nodes
+
+The workflow contains the following main nodes:
 
 ```text
-/home/node/.n8n-files/assets/signature.png
+Gmail Trigger
+Extract Email Context
+Allowed Domain?
+Log Ignored Domain
+OpenAI Intent Analysis
+Normalize Intent
+Approval Request?
+Log Other Topic
+Find PDF Attachment
+Has PDF Attachment?
+Reply Missing PDF
+Prepare PDF Binary
+Create Signature Binary
+Merge PDF + Signature
+Call PDF Signer
+PDF Signer Success?
+Reply With Signed PDF
+Reply Manual Review
+Add Manual Review Label
 ```
 
-### 3. Prepare environment variables
+## AI Intent Classification
 
-Copy the example environment file if needed:
+The workflow uses Groq through an OpenAI-compatible credential in n8n.
 
-```bash
-cp .env.example .env
-```
-
-Do not commit the real `.env` file.
-
-The project uses Groq through an OpenAI-compatible API connection:
+Credential type:
 
 ```text
-GROQ_BASE_URL=https://api.groq.com/openai/v1
-GROQ_MODEL=llama-3.1-8b-instant
+OpenAI-compatible
 ```
 
-### 4. Start the local services
-
-```bash
-docker compose up --build
-```
-
-n8n will be available at:
+Base URL:
 
 ```text
-http://localhost:5678
+https://api.groq.com/openai/v1
 ```
 
-### 5. Configure n8n credentials
-
-Inside n8n, configure:
-
-- Gmail OAuth credentials
-- Groq as an OpenAI-compatible chat model credential
-
-Groq configuration:
+Model:
 
 ```text
-Base URL: https://api.groq.com/openai/v1
-Model: llama-3.1-8b-instant
+llama-3.1-8b-instant
 ```
 
-### 6. Import the n8n workflow
-
-Import this workflow file into n8n:
+The workflow classifies emails into:
 
 ```text
-internship-agent-workflow.json
+approval_request
+OTHER
 ```
 
-Then configure the required credentials on the workflow nodes.
+The workflow includes an additional safety filter in the `Normalize Intent` node so that emails about class schedules, timetables, courses, or exams are treated as `other` even if the model returns a wrong classification.
 
-### 7. Publish the workflow
+## Gmail Integration
 
-The Gmail Trigger should be tested in published mode because manual executions may behave differently from production trigger executions.
+The workflow uses Gmail OAuth2 credentials inside Piotr's n8n server.
 
-## Allowed sender domains
+Connected Gmail account:
 
-The workflow currently allows emails from these domains:
+```text
+ummuzdemir@gmail.com
+```
+
+OAuth Redirect URL used in Google Cloud Console:
+
+```text
+https://steve107-20107.mikrus.cloud/rest/oauth2-credential/callback
+```
+
+The Gmail credential is used by:
+
+```text
+Gmail Trigger
+Reply Missing PDF
+Reply With Signed PDF
+Reply Manual Review
+Add Manual Review Label
+```
+
+## Allowed Domains
+
+The workflow only processes emails from these domains:
 
 ```text
 akademiata.edu.pl
 wseiz.edu.pl
 ```
 
-Emails from other domains should not continue through the approval automation.
+Emails from other domains are ignored.
+
+## Signature Handling
+
+The workflow does not rely on Piotr's n8n server file system for the signature image.
+
+Instead, the signature image is embedded in the n8n workflow as a base64 string inside the `Create Signature Binary` Code node.
+
+This avoids requiring a local file path such as:
+
+```text
+/home/node/.n8n-files/assets/signature.png
+```
+
+The `Create Signature Binary` node creates a binary field named:
+
+```text
+signature_image
+```
+
+The PDF attachment is prepared as:
+
+```text
+pdf
+```
+
+The `Call PDF Signer` node sends both binary fields to the PDF Signer API.
+
+## Local Development
+
+Local development can be done with Docker Compose.
+
+The local setup may include:
+
+```text
+n8n
+pdf-signer
+local signature assets
+test PDF files
+```
+
+However, the final deployed architecture is different:
+
+```text
+Local development:
+n8n + pdf-signer can run locally
+
+Final deployment:
+Piotr's n8n server runs the workflow
+Coolify runs only pdf-signer
+```
+
+## Environment Variables
+
+An example environment file is provided:
+
+```text
+.env.example
+```
+
+Do not commit real secrets.
+
+Sensitive values such as API keys, OAuth client secrets, tokens, and personal signature images must stay out of Git.
 
 ## Testing
 
-Manual testing instructions are documented in:
+Testing instructions are documented in:
 
 ```text
 TEST.md
 ```
 
-The main test scenarios are:
+The main tested scenarios are:
 
-1. Approval request with PDF attachment
-2. Unrelated email
-3. Approval request without PDF attachment
+```text
+Approval request with PDF
+Approval request without PDF
+Unrelated email
+Ignored sender domain
+```
 
-Expected behavior:
+The final live test confirmed that the published n8n workflow automatically processes new emails without manually clicking `Execute workflow`.
 
-- Approval request with PDF attachment → signed PDF reply
-- Unrelated email → no reply
-- Approval request without PDF → missing PDF reply
+## Security Notes
 
-## Security notes
-
-The following files must not be committed:
+Do not commit:
 
 ```text
 .env
-assets/signature.png
-credentials files
-OAuth tokens
-API keys
+Google OAuth client secrets
+Gmail tokens
+Groq API keys
+personal signature image files
+n8n credential exports
 ```
 
-The repository ignores private signature files with:
+The `.gitignore` file excludes local secrets and personal assets.
+
+The personal signature image should not be stored directly in the repository.
+
+## Deployment Summary
+
+### n8n
+
+n8n is already hosted on Piotr's server:
 
 ```text
-assets/*
-!assets/.gitkeep
+https://steve107-20107.mikrus.cloud
 ```
 
-Before committing workflow exports, check that no secrets are present in the JSON file.
+The workflow should be imported into this n8n instance and published there.
 
-Example PowerShell check:
+### PDF Signer
 
-```powershell
-Select-String -Path .\internship-agent-workflow.json -Pattern "gsk_|sk-|OPENAI_API_KEY|GROQ_API_KEY|GOOGLE_CLIENT_SECRET|GOOGLE_CLIENT_ID|client_secret|access_token|refresh_token|password|token|secret" -CaseSensitive:$false
+The PDF Signer is deployed on Coolify.
+
+Current public endpoint:
+
+```text
+http://ummu-internship-pdf-signer.codewithpeter.com/sign
 ```
 
-## Current status
+The n8n `Call PDF Signer` HTTP Request node must point to this endpoint.
 
-Completed:
+## Verified Final Status
 
-- Local n8n workflow
-- Groq intent classification
-- PDF attachment detection
-- Signature image loaded from local disk
-- PDF signing through the PDF signer service
-- Gmail reply with signed PDF
-- Missing PDF reply
-- Ignore unrelated emails
-- Local manual testing
-- Workflow export
-- Test documentation
+The following checks were completed successfully:
 
-## Known limitations and future improvements
+```text
+PDF Signer /docs endpoint works
+PDF Signer /openapi.json endpoint works
+Groq credential works
+Gmail credential works
+Approval request with PDF returns signed PDF
+Approval request without PDF returns missing PDF reply
+Unrelated email sends no reply
+Published workflow runs automatically
+```
 
-- The workflow uses a fixed local signature image.
-- The workflow checks sender domains but does not deeply verify SPF, DKIM, or DMARC headers.
-- AI-based intent classification can still make mistakes in unusual emails.
-- The workflow does not validate the content of the PDF form.
-- Production monitoring and alerting are not yet configured.
+## Notes
 
-## Coolify deployment
+This project intentionally keeps the architecture simple:
 
-Coolify access is available, but deployment steps are intentionally not included in this version yet.
+```text
+n8n workflow on Piotr's n8n server
+PDF Signer API on Coolify
+HTTP connection between them
+```
 
-Deployment documentation will be added after the local workflow, repository structure, and environment documentation are finalized.
+No n8n deployment is required in Coolify.
